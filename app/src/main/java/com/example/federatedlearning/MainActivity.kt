@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import com.example.federatedlearning.databinding.ActivityMainBinding
+import java.sql.Timestamp
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -61,6 +62,19 @@ class MainActivity : ComponentActivity() {
         binding.buttonShowCsv.setOnClickListener {
             val intent = Intent(this, CsvDataActivity::class.java)
             startActivity(intent)
+        }
+
+
+//        binding.deletebutton.setOnClickListener(
+//            deleteCSVbyQuery()
+//        )
+
+
+    }
+
+    private fun deleteCSVbyQuery (sensorName:String,timestamp: Timestamp){
+        csvDataStorage.deleteSensorData { data ->
+            data.sensorName == sensorName && data.timestamp.startsWith(timestamp.toString())
         }
     }
 }

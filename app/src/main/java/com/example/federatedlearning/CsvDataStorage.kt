@@ -50,6 +50,50 @@ class CsvDataStorage(private val context: Context) {
         }
     }
 
+
+    private fun saveCsvFile(dataList: List<Array<String>>) {
+        try {
+            FileWriter(csvFile, false).use { fileWriter ->
+                CSVWriter(fileWriter).use { csvWriter ->
+                    dataList.forEach { data ->
+                        csvWriter.writeNext(data)
+                    }
+                }
+            }
+        } catch (e: IOException) {
+            e.printStackTrace()
+            Toast.makeText(context, "Error deleting data", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun deleteSensorData(query: (SensorData) -> Boolean) {
+        // Read the existing data
+        val existingData = readCsvFile()
+
+        // Convert raw CSV data to SensorData list
+        val sensorDataList = existingData.map {
+            SensorData(
+                sensorName = it[0],
+                timestamp = it[1],
+                values = it[2].split(",").map { value -> value.toFloat() }
+            )
+        }
+
+        // Filter out the data that matches the query
+        val filteredDataList = sensorDataList.filterNot(query)
+
+        // Convert back to Array<String> for saving to CSV
+        val saveDataList = filteredDataList.map {
+            arrayOf(it.sensorName, it.timestamp, it.values.joinToString(","))
+        }
+
+        // Save the filtered data back to the CSV file
+        saveCsvFile(saveDataList)
+
+        // Optionally show a toast message after deletion
+        Toast.makeText(context, "Data deleted successfully", Toast.LENGTH_SHORT).show()
+    }
+
     // Read CSV file and return list of data
     private fun readCsvFile(): List<Array<String>> {
         val csvDataList = mutableListOf<Array<String>>()
