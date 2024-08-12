@@ -1,21 +1,19 @@
 package com.example.federatedlearning
 
+import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import com.example.federatedlearning.databinding.ActivityMainBinding
-import com.example.federatedlearning.ui.theme.FederatedLearningTheme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
-    private lateinit var binding : ActivityMainBinding
+    private lateinit var binding: ActivityMainBinding
     private lateinit var lightSensor: MeasurableSensor
+    private lateinit var csvDataStorage: CsvDataStorage
+    private  var isListening: Boolean=false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,20 +21,46 @@ class MainActivity : ComponentActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        lightSensor = LightSensor(this)
-        lightSensor.startListening()
+        csvDataStorage = CsvDataStorage(this)
 
-        lightSensor.onSensorValuesChanged = { values ->
-            val lightLevel = values[0]
-            binding.textView.text=lightLevel.toString()
-//            if(lightLevel<60f){
-//                binding.textView.text=lightLevel.toString()
-//            }
-//            else{
-//                binding.textView.text="Bright"
-//            }
+        lightSensor = LightSensor(this)
+
+        binding.buttonCSV.setOnClickListener {
+            if(isListening){
+                lightSensor.stopListening()
+                Toast.makeText(this, "Sensor listening stopped.",Toast.LENGTH_SHORT).show()
+                isListening=false
+                binding.buttonCSV.text="Start Data Collection"
+            }else{
+                lightSensor.startListening()
+                Toast.makeText(this, "Sensor listening started.", Toast.LENGTH_SHORT).show()
+                isListening = true
+                binding.buttonCSV.text = "Stop Data Collection"
+
+                lightSensor.onSensorValuesChanged = { values ->
+                    val lightLevel = values[0]
+                    binding.textView.text = lightLevel.toString()
+
+
+                    // for any sensor create object of data class SensorData
+
+                    val sensorData = SensorData(
+                        sensorName = "Light Sensor",
+                        timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
+                        values = listOf(lightLevel)
+                    )
+                    csvDataStorage.saveSensorData(sensorData)
+
+
+                }
+
+
+            }
         }
 
-
+        binding.buttonShowCsv.setOnClickListener {
+            val intent = Intent(this, CsvDataActivity::class.java)
+            startActivity(intent)
+        }
     }
 }
