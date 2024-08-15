@@ -51,11 +51,11 @@ class MainActivity : ComponentActivity() {
                     val z = values[2]
                     binding.gyrometer.text = "x:${x} y:${y} z:${z}"
                     val accelerometerSensorData = SensorData(
-                        sensorName = "accelerometer Sensor",
+                        sensorName = "accelerometer",
                         timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
                         values = listOf(x,y,z)
                     )
-                    //csvDataStorage.saveSensorData(accelerometerSensorData)
+                    csvDataStorage.saveSensorData(accelerometerSensorData)
                 }
 
                 gyroSensor.onSensorValuesChanged = { values ->
@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                     val z = values[2]
                     binding.accelerometer.text = "x:${x} y:${y} z:${z}"
                     val gyroSensorData = SensorData(
-                        sensorName = "Gyro Sensor",
+                        sensorName = "gyroscope",
                         timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
                         values = listOf(x,y,z)
                     )

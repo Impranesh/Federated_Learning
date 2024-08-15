@@ -1,6 +1,7 @@
 package com.example.federatedlearning
 
 import android.content.Context
+import android.util.Log
 import android.widget.Toast
 import com.opencsv.CSVReader
 import com.opencsv.CSVWriter
@@ -14,88 +15,59 @@ import java.util.Locale
 
 class CsvDataStorage(private val context: Context) {
 
-    private val csvFile: File = File(context.filesDir, "sensor_data.csv")
+    private val accelerometerDir: File = File(context.filesDir, "accelerometer")
+    private val gyroscopeDir: File = File(context.filesDir, "gyroscope")
 
-    // Save sensor data to CSV only if it's different from the most recent data
+
+    init {
+        // Create directories if they don't exist
+        if (!accelerometerDir.exists()) accelerometerDir.mkdir()
+        if (!gyroscopeDir.exists()) gyroscopeDir.mkdir()
+    }
     fun saveSensorData(sensorData: SensorData) {
+        val (targetDir, fileName) = when (sensorData.sensorName) {
+            "accelerometer" -> accelerometerDir to "accelerometer_data.csv"
+            "gyroscope" -> gyroscopeDir to "gyroscope_data.csv"
+            else -> return // Unsupported sensor type
+        }
 
-        //ReadCsvFile to get CSV file saved data
+        val csvFile = File(targetDir, fileName)
+        val existingData = readCsvFile(csvFile)
 
-        val existingData = readCsvFile()
-
-        // Find the most recent entry for the same sensor
-        val mostRecentEntry = existingData.filter { it[0] == sensorData.sensorName }
-            .maxByOrNull { parseTimestamp(it[1]) }
+        // Find the most recent entry in the CSV file
+        val mostRecentEntry = existingData.maxByOrNull { parseTimestamp(it[0]) }
 
         // Check if the new data is different from the most recent entry
-        val isDifferent = mostRecentEntry == null || !valuesEqual(mostRecentEntry[2].split(",").map { it.toFloat() }, sensorData.values)
+        val isDifferent = mostRecentEntry == null || !valuesEqual(mostRecentEntry[1].split(",").map { it.toFloat() }, sensorData.values)
 
         if (isDifferent) {
             try {
+                // Append new data to the CSV file
                 FileWriter(csvFile, true).use { fileWriter ->
                     CSVWriter(fileWriter).use { csvWriter ->
-                        csvWriter.writeNext(arrayOf(sensorData.sensorName, sensorData.timestamp, sensorData.values.joinToString(",")))
+                        csvWriter.writeNext(arrayOf(sensorData.timestamp, sensorData.values.joinToString(",")))
                     }
                 }
-                // Optionally show toast message after successfully saving data
-                // Toast.makeText(context, "Data saved successfully", Toast.LENGTH_SHORT).show()
+                // Log the stored data
+//                Log.d("CsvDataStorage", "Data saved: ${sensorData.sensorName}, ${sensorData.timestamp}, ${sensorData.values.joinToString(",")}")
+//
+//                // Show a Toast to confirm saving
+//                Toast.makeText(context, "Data saved for ${sensorData.sensorName}", Toast.LENGTH_SHORT).show()
             } catch (e: IOException) {
                 e.printStackTrace()
-                // Optionally show toast message if an error occurs
-                // Toast.makeText(context, "Error saving data", Toast.LENGTH_SHORT).show()
+                // Handle the error with a Toast message
+                Toast.makeText(context, "Failed to save data: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         } else {
-            // Optionally show toast message if data is already present
-            // Toast.makeText(context, "Data already exists for this sensor and timestamp", Toast.LENGTH_SHORT).show()
+            // Log that the data was not different
+//            Log.d("CsvDataStorage", "Data not saved as it is identical to the most recent entry.")
+//            Toast.makeText(context, "Data not saved, as it is identical to the most recent entry for ${sensorData.sensorName}", Toast.LENGTH_SHORT).show()
         }
     }
 
-
-    private fun saveCsvFile(dataList: List<Array<String>>) {
-        try {
-            FileWriter(csvFile, false).use { fileWriter ->
-                CSVWriter(fileWriter).use { csvWriter ->
-                    dataList.forEach { data ->
-                        csvWriter.writeNext(data)
-                    }
-                }
-            }
-        } catch (e: IOException) {
-            e.printStackTrace()
-            Toast.makeText(context, "Error deleting data", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    fun deleteSensorData(query: (SensorData) -> Boolean) {
-        // Read the existing data
-        val existingData = readCsvFile()
-
-        // Convert raw CSV data to SensorData list
-        val sensorDataList = existingData.map {
-            SensorData(
-                sensorName = it[0],
-                timestamp = it[1],
-                values = it[2].split(",").map { value -> value.toFloat() }
-            )
-        }
-
-        // Filter out the data that matches the query
-        val filteredDataList = sensorDataList.filterNot(query)
-
-        // Convert back to Array<String> for saving to CSV
-        val saveDataList = filteredDataList.map {
-            arrayOf(it.sensorName, it.timestamp, it.values.joinToString(","))
-        }
-
-        // Save the filtered data back to the CSV file
-        saveCsvFile(saveDataList)
-
-        // Optionally show a toast message after deletion
-        Toast.makeText(context, "Data deleted successfully", Toast.LENGTH_SHORT).show()
-    }
 
     // Read CSV file and return list of data
-    private fun readCsvFile(): List<Array<String>> {
+    private fun readCsvFile(csvFile: File): List<Array<String>> {
         val csvDataList = mutableListOf<Array<String>>()
         if (csvFile.exists()) {
             try {
