@@ -12,7 +12,9 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private lateinit var binding: ActivityMainBinding
-    private lateinit var lightSensor: MeasurableSensor
+    //private lateinit var lightSensor: MeasurableSensor
+    private lateinit var gyroSensor: MeasurableSensor
+    private lateinit var accelerometerSensor: MeasurableSensor
     private lateinit var csvDataStorage: CsvDataStorage
     private  var isListening: Boolean=false
 
@@ -24,37 +26,51 @@ class MainActivity : ComponentActivity() {
 
         csvDataStorage = CsvDataStorage(this)
 
-        lightSensor = LightSensor(this)
+        //lightSensor = LightSensor(this)
+        gyroSensor = GyroSensor(this)
+        accelerometerSensor = AccelerometerSensor(this)
 
         binding.buttonCSV.setOnClickListener {
             if(isListening){
-                lightSensor.stopListening()
+                //lightSensor.stopListening()
+                gyroSensor.stopListening()
+                accelerometerSensor.stopListening()
                 Toast.makeText(this, "Sensor listening stopped.",Toast.LENGTH_SHORT).show()
                 isListening=false
                 binding.buttonCSV.text="Start Data Collection"
             }else{
-                lightSensor.startListening()
+                //lightSensor.startListening()
+                gyroSensor.startListening()
+                accelerometerSensor.startListening()
                 Toast.makeText(this, "Sensor listening started.", Toast.LENGTH_SHORT).show()
                 isListening = true
                 binding.buttonCSV.text = "Stop Data Collection"
 
-                lightSensor.onSensorValuesChanged = { values ->
-                    val lightLevel = values[0]
-                    binding.textView.text = lightLevel.toString()
-
-
-                    // for any sensor create object of data class SensorData
-
-                    val sensorData = SensorData(
-                        sensorName = "Light Sensor",
+                accelerometerSensor.onSensorValuesChanged = { values ->
+                    val x = values[0]
+                    val y = values[1]
+                    val z = values[2]
+                    binding.textView.text = x.toString()
+                    val accelerometerSensorData = SensorData(
+                        sensorName = "accelerometer Sensor",
                         timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
-                        values = listOf(lightLevel)
+                        values = listOf(x,y,z)
                     )
-                    csvDataStorage.saveSensorData(sensorData)
-
-
+                    //csvDataStorage.saveSensorData(accelerometerSensorData)
                 }
 
+                gyroSensor.onSensorValuesChanged = { values ->
+                    val x = values[0]
+                    val y = values[1]
+                    val z = values[2]
+                    //binding.textView.text = lightLevel.toString()
+                    val gyroSensorData = SensorData(
+                        sensorName = "Gyro Sensor",
+                        timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
+                        values = listOf(x,y,z)
+                    )
+                    csvDataStorage.saveSensorData(gyroSensorData)
+                }
 
             }
         }
@@ -64,17 +80,5 @@ class MainActivity : ComponentActivity() {
             startActivity(intent)
         }
 
-
-//        binding.deletebutton.setOnClickListener(
-//            deleteCSVbyQuery()
-//        )
-
-
-    }
-
-    private fun deleteCSVbyQuery (sensorName:String,timestamp: Timestamp){
-        csvDataStorage.deleteSensorData { data ->
-            data.sensorName == sensorName && data.timestamp.startsWith(timestamp.toString())
-        }
     }
 }

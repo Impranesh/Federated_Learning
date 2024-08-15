@@ -1,4 +1,3 @@
-// SensorData.kt
 package com.example.federatedlearning
 
 data class SensorData(
