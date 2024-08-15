@@ -12,7 +12,6 @@ import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private lateinit var binding: ActivityMainBinding
-    //private lateinit var lightSensor: MeasurableSensor
     private lateinit var gyroSensor: MeasurableSensor
     private lateinit var accelerometerSensor: MeasurableSensor
     private lateinit var csvDataStorage: CsvDataStorage
@@ -50,7 +49,7 @@ class MainActivity : ComponentActivity() {
                     val x = values[0]
                     val y = values[1]
                     val z = values[2]
-                    binding.textView.text = x.toString()
+                    binding.gyrometer.text = "x:${x} y:${y} z:${z}"
                     val accelerometerSensorData = SensorData(
                         sensorName = "accelerometer Sensor",
                         timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
@@ -63,7 +62,7 @@ class MainActivity : ComponentActivity() {
                     val x = values[0]
                     val y = values[1]
                     val z = values[2]
-                    //binding.textView.text = lightLevel.toString()
+                    binding.accelerometer.text = "x:${x} y:${y} z:${z}"
                     val gyroSensorData = SensorData(
                         sensorName = "Gyro Sensor",
                         timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
