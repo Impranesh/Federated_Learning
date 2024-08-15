@@ -2,6 +2,8 @@ package com.example.federatedlearning
 
 import android.os.Bundle
 import android.util.Log
+import android.view.View
+import android.widget.ProgressBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -26,14 +28,18 @@ class CsvDataActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        setContentView(R.layout.activity_csv_data)
         binding = ActivityCsvDataBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.progressBar.visibility = View.GONE
 
         // Start loading data asynchronously
         loadCsvData()
     }
     private fun loadCsvData() {
+        binding.progressBar.visibility=View.VISIBLE
+
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val accelerometerData = readCsvFileInChunks(
@@ -59,9 +65,14 @@ class CsvDataActivity : AppCompatActivity() {
                     val recyclerView: RecyclerView = binding.recyclerViewCsvData
                     recyclerView.layoutManager = LinearLayoutManager(this@CsvDataActivity)
                     recyclerView.adapter = CsvDataAdapter(displayDataList)
+                        binding.progressBar.visibility = View.GONE  //Hide progressBar once data is loaded
+                    binding.recyclerViewCsvData.visibility=View.VISIBLE
                 }
             }catch (e:Exception){
                 e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    binding.progressBar.visibility = View.GONE // Hide progress bar in case of error
+                }
             }
         }
     }
