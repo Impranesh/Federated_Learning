@@ -78,4 +78,6 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     implementation ("com.opencsv:opencsv:5.5.2")
     implementation ("androidx.databinding:databinding-runtime:7.0.0")
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1" )
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
 }

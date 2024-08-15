@@ -1,6 +1,8 @@
 package com.example.federatedlearning
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import com.opencsv.CSVReader
@@ -12,17 +14,23 @@ import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
 
 class CsvDataStorage(private val context: Context) {
 
     private val accelerometerDir: File = File(context.filesDir, "accelerometer")
     private val gyroscopeDir: File = File(context.filesDir, "gyroscope")
+    private val executor = Executors.newSingleThreadExecutor()
+    private val dataQueue = LinkedBlockingQueue<SensorData>()
+    private val handler = Handler(Looper.getMainLooper())
 
 
     init {
         // Create directories if they don't exist
         if (!accelerometerDir.exists()) accelerometerDir.mkdir()
         if (!gyroscopeDir.exists()) gyroscopeDir.mkdir()
+        startDataWriter()
     }
     fun saveSensorData(sensorData: SensorData) {
         val (targetDir, fileName) = when (sensorData.sensorName) {
@@ -85,6 +93,31 @@ class CsvDataStorage(private val context: Context) {
         }
         return csvDataList
     }
+
+
+    private fun startDataWriter() {
+        executor.execute {
+            while (true) {
+                try {
+                    val data = dataQueue.take() // Blocking call to fetch data from the queue
+                    saveSensorData(data)
+                } catch (e: InterruptedException) {
+                    // Handle interruption (e.g., app shutdown)
+                    Thread.currentThread().interrupt()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    handler.post {
+                        Toast.makeText(context, "Error processing data: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
+
+    fun queueSensorData(sensorData: SensorData) {
+        dataQueue.offer(sensorData) // Non-blocking call to add data to the queue
+    }
+
 
     // Helper function to parse the timestamp
     private fun parseTimestamp(timestamp: String): Date {

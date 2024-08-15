@@ -7,6 +7,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.federatedlearning.databinding.ActivityCsvDataBinding
 import com.opencsv.CSVReader
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.BufferedReader
 import java.io.File
 import java.io.FileReader
 import java.io.IOException
@@ -17,6 +22,7 @@ import java.util.Locale
 class CsvDataActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityCsvDataBinding
+    private val chunkSize=10000
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -24,57 +30,78 @@ class CsvDataActivity : AppCompatActivity() {
         binding = ActivityCsvDataBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        //Read the data
-        val accelerometerData = readCsvFile(File(filesDir, "accelerometer/accelerometer_data.csv"),"accelerometer")
-        val gyroscopeData = readCsvFile(File(filesDir, "gyroscope/gyroscope_data.csv"),"gyro")
-
-        //Merge the data from both sensors
-        val rawData = accelerometerData + gyroscopeData
-
-        // Convert raw CSV data to SensorData list
-
-        // Sort the data by timestamp in descending order
-        val sortedDataList = rawData.sortedByDescending { parseTimestamp(it.timestamp) }
-
-        // Optionally convert back to Array<String> if needed for display
-        val displayDataList = sortedDataList.map {
-            arrayOf(it.sensorName, it.timestamp, it.values.joinToString(","))
-        }
-
-//        Log.d("CsvDataActivity", "Data size: ${displayDataList.size}")
-//        displayDataList.forEach { Log.d("CsvDataActivity", "Data: ${it.joinToString()}") }
-
-
-        val recyclerView: RecyclerView = binding.recyclerViewCsvData
-        recyclerView.layoutManager = LinearLayoutManager(this)
-        recyclerView.adapter = CsvDataAdapter(displayDataList)
+        // Start loading data asynchronously
+        loadCsvData()
     }
+    private fun loadCsvData() {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val accelerometerData = readCsvFileInChunks(
+                    File(filesDir, "accelerometer/accelerometer_data.csv"),
+                    "accelerometer"
+                )
+                val gyroscopeData =
+                    readCsvFileInChunks(File(filesDir, "gyroscope/gyroscope_data.csv"), "gyro")
 
-    private fun readCsvFile(csvFile: File,sensorName: String): List<SensorData> {
-//        val csvDataList = mutableListOf<Array<String>>()
+                // Merge the data from both sensors
+                val rawData = accelerometerData + gyroscopeData
+
+                // Sort the data by timestamp in descending order
+                val sortedDataList = rawData.sortedByDescending { parseTimestamp(it.timestamp) }
+
+                // Convert data to display format
+                val displayDataList = sortedDataList.map {
+                    arrayOf(it.sensorName, it.timestamp, it.values.joinToString(","))
+                }
+
+                withContext(Dispatchers.Main) {
+                    // Update UI on the main thread
+                    val recyclerView: RecyclerView = binding.recyclerViewCsvData
+                    recyclerView.layoutManager = LinearLayoutManager(this@CsvDataActivity)
+                    recyclerView.adapter = CsvDataAdapter(displayDataList)
+                }
+            }catch (e:Exception){
+                e.printStackTrace()
+            }
+        }
+    }
+    private fun readCsvFileInChunks(file: File, sensorName: String): List<SensorData> {
         val sensorDataList = mutableListOf<SensorData>()
 
-        if (csvFile.exists()) {
+        if (file.exists()) {
             try {
-                FileReader(csvFile).use { fileReader ->
-                    CSVReader(fileReader).use { csvReader ->
-                        var nextLine: Array<String>?
-                        while (csvReader.readNext().also { nextLine = it } != null) {
-//                            csvDataList.add(nextLine!!)
-                            //Create an object named SensorDataList
-                            sensorDataList.add(
-                                SensorData(
-                                    sensorName = sensorName,
-                                    timestamp = nextLine!![0],
-                                    values = nextLine!![1].split(",").map { value -> value.toFloat() }
-                                )
-                            )
+                BufferedReader(FileReader(file)).use { reader ->
+                    val csvReader = CSVReader(reader)
+                    var nextLine: Array<String>?
+                    var chunk = mutableListOf<SensorData>()
+
+                    while (csvReader.readNext().also { nextLine = it } != null) {
+                        // Create SensorData from each row
+                        val sensorData = SensorData(
+                            sensorName = sensorName,
+                            timestamp = nextLine!![0],
+                            values = nextLine!![1].split(",").map { value -> value.toFloatOrNull() ?: 0f }
+                        )
+
+                        chunk.add(sensorData)
+
+                        // Process chunk if it reaches the defined size
+                        if (chunk.size >= chunkSize) {
+                            sensorDataList.addAll(chunk)
+                            chunk.clear()
                         }
+                    }
+
+                    // Add remaining data
+                    if (chunk.isNotEmpty()) {
+                        sensorDataList.addAll(chunk)
                     }
                 }
             } catch (e: IOException) {
                 e.printStackTrace()
             }
+        }else{
+            Log.e("CsvDataActivity", "File does not exist: ${file.absolutePath}")
         }
 
         return sensorDataList

@@ -46,29 +46,40 @@ class MainActivity : ComponentActivity() {
                 binding.buttonCSV.text = "Stop Data Collection"
 
                 accelerometerSensor.onSensorValuesChanged = { values ->
-                    val x = values[0]
-                    val y = values[1]
-                    val z = values[2]
-                    binding.gyrometer.text = "x:${x} y:${y} z:${z}"
-                    val accelerometerSensorData = SensorData(
-                        sensorName = "accelerometer",
-                        timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
-                        values = listOf(x,y,z)
-                    )
-                    csvDataStorage.saveSensorData(accelerometerSensorData)
+                    if(values.size>=3) {
+                        val x = values[0]
+                        val y = values[1]
+                        val z = values[2]
+                        binding.accelerometer.text = "x:${x} y:${y} z:${z}"
+
+                        val accelerometerSensorData = SensorData(
+                            sensorName = "accelerometer",
+                            timestamp = SimpleDateFormat(
+                                "yyyy-MM-dd HH:mm:ss",
+                                Locale.getDefault()
+                            ).format(Date()),
+                            values = listOf(x, y, z)
+                        )
+                        saveSensorDataSafely(accelerometerSensorData)
+                    }
                 }
 
                 gyroSensor.onSensorValuesChanged = { values ->
-                    val x = values[0]
-                    val y = values[1]
-                    val z = values[2]
-                    binding.accelerometer.text = "x:${x} y:${y} z:${z}"
-                    val gyroSensorData = SensorData(
-                        sensorName = "gyroscope",
-                        timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
-                        values = listOf(x,y,z)
-                    )
-                    csvDataStorage.saveSensorData(gyroSensorData)
+                    if(values.size>=3) {
+                        val x = values[0]
+                        val y = values[1]
+                        val z = values[2]
+                        binding.gyrometer.text = "x:${x} y:${y} z:${z}"
+                        val gyroSensorData = SensorData(
+                            sensorName = "gyroscope",
+                            timestamp = SimpleDateFormat(
+                                "yyyy-MM-dd HH:mm:ss",
+                                Locale.getDefault()
+                            ).format(Date()),
+                            values = listOf(x, y, z)
+                        )
+                        saveSensorDataSafely(gyroSensorData)
+                    }
                 }
 
             }
@@ -79,5 +90,18 @@ class MainActivity : ComponentActivity() {
             startActivity(intent)
         }
 
+    }
+    private fun saveSensorDataSafely(sensorData: SensorData) {
+        // Run data saving on a background thread
+        Thread {
+            try {
+                csvDataStorage.queueSensorData(sensorData)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                runOnUiThread {
+                    Toast.makeText(this, "Failed to save data: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }.start()
     }
 }
