@@ -54,10 +54,7 @@ class MainActivity : ComponentActivity() {
 
                         val accelerometerSensorData = SensorData(
                             sensorName = "accelerometer",
-                            timestamp = SimpleDateFormat(
-                                "yyyy-MM-dd HH:mm:ss",
-                                Locale.getDefault()
-                            ).format(Date()),
+                            timestamp = System.currentTimeMillis().toString(),
                             values = listOf(x, y, z)
                         )
                         saveSensorDataSafely(accelerometerSensorData)
@@ -72,10 +69,7 @@ class MainActivity : ComponentActivity() {
                         binding.gyrometer.text = "x:${x} y:${y} z:${z}"
                         val gyroSensorData = SensorData(
                             sensorName = "gyroscope",
-                            timestamp = SimpleDateFormat(
-                                "yyyy-MM-dd HH:mm:ss",
-                                Locale.getDefault()
-                            ).format(Date()),
+                            timestamp = System.currentTimeMillis().toString(),
                             values = listOf(x, y, z)
                         )
                         saveSensorDataSafely(gyroSensorData)

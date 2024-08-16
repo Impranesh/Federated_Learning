@@ -5,8 +5,13 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.widget.Toast
+import androidx.room.Dao
+import androidx.room.Room
 import com.opencsv.CSVReader
 import com.opencsv.CSVWriter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import java.io.File
 import java.io.FileReader
 import java.io.FileWriter
@@ -16,99 +21,41 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
+import kotlinx.coroutines.*
+import java.io.*
+import java.util.*
+
 
 class CsvDataStorage(private val context: Context) {
 
     private val accelerometerDir: File = File(context.filesDir, "accelerometer")
     private val gyroscopeDir: File = File(context.filesDir, "gyroscope")
-    private val executor = Executors.newSingleThreadExecutor()
     private val dataQueue = LinkedBlockingQueue<SensorData>()
     private val handler = Handler(Looper.getMainLooper())
 
+    val db = Room.databaseBuilder(
+        context,
+        SensorDataDatabase::class.java, "sensor-data"
+    ).build()
 
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     init {
         // Create directories if they don't exist
         if (!accelerometerDir.exists()) accelerometerDir.mkdir()
         if (!gyroscopeDir.exists()) gyroscopeDir.mkdir()
         startDataWriter()
     }
-    fun saveSensorData(sensorData: SensorData) {
-        val (targetDir, fileName) = when (sensorData.sensorName) {
-            "accelerometer" -> accelerometerDir to "accelerometer_data.csv"
-            "gyroscope" -> gyroscopeDir to "gyroscope_data.csv"
-            else -> return // Unsupported sensor type
-        }
-
-        val csvFile = File(targetDir, fileName)
-        val existingData = readCsvFile(csvFile)
-
-        // Find the most recent entry in the CSV file
-        val mostRecentEntry = existingData.maxByOrNull { parseTimestamp(it[0]) }
-
-        // Check if the new data is different from the most recent entry
-        val isDifferent = mostRecentEntry == null || !valuesEqual(mostRecentEntry[1].split(",").map { it.toFloat() }, sensorData.values)
-
-        if (isDifferent) {
-            try {
-                // Append new data to the CSV file
-                FileWriter(csvFile, true).use { fileWriter ->
-                    CSVWriter(fileWriter).use { csvWriter ->
-                        csvWriter.writeNext(arrayOf(sensorData.timestamp, sensorData.values.joinToString(",")))
-                    }
-                }
-                // Log the stored data
-//                Log.d("CsvDataStorage", "Data saved: ${sensorData.sensorName}, ${sensorData.timestamp}, ${sensorData.values.joinToString(",")}")
-//
-//                // Show a Toast to confirm saving
-//                Toast.makeText(context, "Data saved for ${sensorData.sensorName}", Toast.LENGTH_SHORT).show()
-            } catch (e: IOException) {
-                e.printStackTrace()
-                // Handle the error with a Toast message
-                Toast.makeText(context, "Failed to save data: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
-        } else {
-            // Log that the data was not different
-//            Log.d("CsvDataStorage", "Data not saved as it is identical to the most recent entry.")
-//            Toast.makeText(context, "Data not saved, as it is identical to the most recent entry for ${sensorData.sensorName}", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-
-    // Read CSV file and return list of data
-    private fun readCsvFile(csvFile: File): List<Array<String>> {
-        val csvDataList = mutableListOf<Array<String>>()
-        if (csvFile.exists()) {
-            try {
-                FileReader(csvFile).use { fileReader ->
-                    CSVReader(fileReader).use { csvReader ->
-                        var nextLine: Array<String>?
-                        while (csvReader.readNext().also { nextLine = it } != null) {
-                            csvDataList.add(nextLine!!)
-                        }
-                    }
-                }
-            } catch (e: IOException) {
-                e.printStackTrace()
-            }
-        }
-        return csvDataList
-    }
-
 
     private fun startDataWriter() {
-        executor.execute {
-            while (true) {
+        scope.launch {
+            val dao = db.sensorDAO()
+//            val buffer = mutableListOf<SensorData>()
+            while (isActive) {
                 try {
-                    val data = dataQueue.take() // Blocking call to fetch data from the queue
-                    saveSensorData(data)
-                } catch (e: InterruptedException) {
-                    // Handle interruption (e.g., app shutdown)
-                    Thread.currentThread().interrupt()
+                    val data = dataQueue.poll(1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    if (data != null) dao.save(data)
                 } catch (e: Exception) {
-                    e.printStackTrace()
-                    handler.post {
-                        Toast.makeText(context, "Error processing data: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
+                    handleError(e)
                 }
             }
         }
@@ -118,15 +65,10 @@ class CsvDataStorage(private val context: Context) {
         dataQueue.offer(sensorData) // Non-blocking call to add data to the queue
     }
 
-
-    // Helper function to parse the timestamp
-    private fun parseTimestamp(timestamp: String): Date {
-        return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timestamp) ?: Date()
-    }
-
-    // Helper function to compare values
-    private fun valuesEqual(existingValues: List<Float>, newValues: List<Float>): Boolean {
-        if (existingValues.size != newValues.size) return false
-        return existingValues.zip(newValues).all { (e, n) -> e == n }
+    private fun handleError(e: Exception) {
+        e.printStackTrace()
+        handler.post {
+            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 }
