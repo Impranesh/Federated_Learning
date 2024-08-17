@@ -3,7 +3,6 @@ package com.example.federatedlearning
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.widget.ProgressBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -17,9 +16,6 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.FileReader
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class CsvDataActivity : AppCompatActivity() {
 
@@ -53,10 +49,10 @@ class CsvDataActivity : AppCompatActivity() {
                 val rawData = accelerometerData + gyroscopeData
 
                 // Sort the data by timestamp in descending order
-                val sortedDataList = rawData.sortedByDescending { parseTimestamp(it.timestamp) }
-
-                // Convert data to display format
-                val displayDataList = sortedDataList.map {
+//                val sortedDataList = rawData.sortedByDescending { parseTimestamp(it.timestamp) }
+//
+//                // Convert data to display format
+                val displayDataList = rawData.map {
                     arrayOf(it.sensorName, it.timestamp, it.values.joinToString(","))
                 }
 
@@ -84,7 +80,7 @@ class CsvDataActivity : AppCompatActivity() {
                 BufferedReader(FileReader(file)).use { reader ->
                     val csvReader = CSVReader(reader)
                     var nextLine: Array<String>?
-                    var chunk = mutableListOf<SensorData>()
+                    val chunk = mutableListOf<SensorData>()
 
                     while (csvReader.readNext().also { nextLine = it } != null) {
                         // Create SensorData from each row
@@ -119,8 +115,8 @@ class CsvDataActivity : AppCompatActivity() {
     }
 
     // Helper function to parse the timestamp
-    private fun parseTimestamp(timestamp: String): Date {
-        return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timestamp) ?: Date()
-    }
+//    private fun parseTimestamp(timestamp: String): Date {
+//        return SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(timestamp) ?: Date()
+//    }
 }
 

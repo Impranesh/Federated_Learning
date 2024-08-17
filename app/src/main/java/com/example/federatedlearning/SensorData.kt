@@ -5,8 +5,8 @@ import androidx.room.PrimaryKey
 
 @Entity
 data class SensorData(
+    @PrimaryKey (autoGenerate = true) val id:Long =0,
     val sensorName: String,
-    @PrimaryKey
     val timestamp: String,
     val values: List<Float>
 )

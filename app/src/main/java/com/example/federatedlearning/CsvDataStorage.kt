@@ -3,27 +3,22 @@ package com.example.federatedlearning
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.widget.Toast
-import androidx.room.Dao
 import androidx.room.Room
-import com.opencsv.CSVReader
 import com.opencsv.CSVWriter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.BufferedWriter
 import java.io.File
-import java.io.FileReader
 import java.io.FileWriter
 import java.io.IOException
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
-import kotlinx.coroutines.*
-import java.io.*
-import java.util.*
+import java.util.concurrent.TimeUnit
 
 
 class CsvDataStorage(private val context: Context) {
@@ -32,8 +27,12 @@ class CsvDataStorage(private val context: Context) {
     private val gyroscopeDir: File = File(context.filesDir, "gyroscope")
     private val dataQueue = LinkedBlockingQueue<SensorData>()
     private val handler = Handler(Looper.getMainLooper())
+    private val bufferSize=8*1024
+    private val batchSize=1000
 
-    val db = Room.databaseBuilder(
+    //RoomDatabase BUILDER
+
+    private val db = Room.databaseBuilder(
         context,
         SensorDataDatabase::class.java, "sensor-data"
     ).build()
@@ -52,7 +51,9 @@ class CsvDataStorage(private val context: Context) {
 //            val buffer = mutableListOf<SensorData>()
             while (isActive) {
                 try {
-                    val data = dataQueue.poll(1000, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    val data = withContext(Dispatchers.IO) {
+                        dataQueue.poll(1000, TimeUnit.MILLISECONDS)
+                    }
                     if (data != null) dao.save(data)
                 } catch (e: Exception) {
                     handleError(e)
@@ -64,6 +65,62 @@ class CsvDataStorage(private val context: Context) {
     fun queueSensorData(sensorData: SensorData) {
         dataQueue.offer(sensorData) // Non-blocking call to add data to the queue
     }
+
+     fun scheduleDataExport() {
+        scope.launch {
+            while (isActive) {
+                delay(10_000) // 10 seconds delay
+                exportDataToCSV()
+            }
+        }
+         handler.post {
+             Toast.makeText(context, "DataExported Successfully. ", Toast.LENGTH_SHORT).show()
+         }
+    }
+    private fun exportDataToCSV() {
+        scope.launch {
+            val dao = db.sensorDAO()
+            var hasMoreData = true
+            while (hasMoreData) {
+                // Fetch a batch of accelerometer data
+                val accelerometerData = dao.getAccelerometerDataBatch(batchSize)
+                if (accelerometerData.isNotEmpty()) {
+                    val exportedIds =
+                        exportToCsv(accelerometerData, accelerometerDir, "accelerometer_data.csv")
+                    dao.deleteSensorDataBatch(exportedIds)
+                }
+                // Fetch a batch of gyroscope data
+                val gyroscopeData = dao.getGyroscopeDataBatch(batchSize)
+                if (gyroscopeData.isNotEmpty()) {
+                    val exportedIds = exportToCsv(gyroscopeData, gyroscopeDir, "gyroscope_data.csv")
+                    dao.deleteSensorDataBatch(exportedIds)
+                }
+
+                // Check if there is more data to process
+                hasMoreData = accelerometerData.isNotEmpty() || gyroscopeData.isNotEmpty()
+            }
+        }
+    }
+    private fun exportToCsv(dataList: List<SensorData>, targetDir: File, fileName: String): List<Long> {
+        val exportedIds = mutableListOf<Long>()
+        if (dataList.isNotEmpty()) {
+            val csvFile = File(targetDir, fileName)
+            try {
+                BufferedWriter(FileWriter(csvFile, true), bufferSize).use { fileWriter ->
+                    CSVWriter(fileWriter).use { csvWriter ->
+                        dataList.forEach { sensorData ->
+                            csvWriter.writeNext(arrayOf(sensorData.timestamp, sensorData.values.joinToString(",")))
+                            exportedIds.add(sensorData.id) // Track the exported ID
+                        }
+                    }
+                }
+            } catch (e: IOException) {
+                handleError(e)
+            }
+        }
+        return exportedIds // Return the list of IDs that were exported
+    }
+
 
     private fun handleError(e: Exception) {
         e.printStackTrace()

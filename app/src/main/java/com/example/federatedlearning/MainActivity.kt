@@ -83,6 +83,10 @@ class MainActivity : ComponentActivity() {
             val intent = Intent(this, CsvDataActivity::class.java)
             startActivity(intent)
         }
+        binding.deletebutton.setOnClickListener {
+            Toast.makeText(this, "DataExport is Clicked.", Toast.LENGTH_SHORT).show()
+            csvDataStorage.scheduleDataExport()
+        }
 
     }
     private fun saveSensorDataSafely(sensorData: SensorData) {
